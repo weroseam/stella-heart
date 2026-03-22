@@ -34,21 +34,15 @@
 
 * { margin:0; padding:0; box-sizing:border-box; }
 
-html {
-  height: 100%;
-  overflow: hidden;
-}
-
 body {
   background: var(--deep1);
   color: var(--text);
   font-family: 'Noto Serif JP', serif;
   font-size: var(--fs-base);
   font-weight: 500;
-  height: 100%;
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ===== AURORA BACKGROUND ===== */
@@ -57,6 +51,12 @@ body {
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  /* 背景ガクガク防止 */
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .bg-base {
@@ -152,14 +152,11 @@ body {
 
 /* ===== LAYOUT ===== */
 .app {
-  position: fixed;
-  inset: 0;
+  position: relative;
   z-index: 1;
   max-width: 430px;
   margin: 0 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  min-height: 100vh;
   padding-bottom: 90px;
 }
 
@@ -1210,7 +1207,7 @@ body.large-font .attract-draw-btn { font-size: 17px !important; }
 </div>
 
 <!-- ===== SETUP SCREEN ===== -->
-<div id="setupScreen" style="display:none;position:relative;z-index:10;min-height:100vh">
+<div id="setupScreen" style="display:none;position:relative;z-index:10;min-height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div class="setup-wrap">
 
     <!-- Golden FOL like reference image -->
@@ -1871,7 +1868,6 @@ const PW = 's999888t';
 function setCookie(name,value,days){
   const d=new Date();d.setTime(d.getTime()+(days*24*60*60*1000));
   const expires=d.toUTCString();
-  // 複数の形式で保存してSafariのITPを回避
   try{ document.cookie=`${name}=${encodeURIComponent(value)};expires=${expires};path=/;SameSite=Strict`; }catch(e){}
   try{ document.cookie=`${name}=${encodeURIComponent(value)};expires=${expires};path=/`; }catch(e){}
 }
@@ -1885,7 +1881,6 @@ function getCookie(name){
 // ストレージ統合ユーティリティ（localStorage + Cookie 二重保存）
 function stellaSave(key, value){
   try{ localStorage.setItem(key, value); }catch(e){}
-  // Cookieにも保存（最大4KB制限があるため長いデータは分割）
   try{
     if(value && value.length < 3000){
       setCookie('s_'+key, value, 365);
@@ -1893,7 +1888,6 @@ function stellaSave(key, value){
   }catch(e){}
 }
 function stellaLoad(key){
-  // localStorageを優先、なければCookieから復元
   try{
     const ls = localStorage.getItem(key);
     if(ls !== null && ls !== undefined) return ls;
@@ -1901,7 +1895,6 @@ function stellaLoad(key){
   try{
     const ck = getCookie('s_'+key);
     if(ck !== null && ck !== undefined){
-      // Cookieから読めたらlocalStorageにも復元
       try{ localStorage.setItem(key, ck); }catch(e){}
       return ck;
     }

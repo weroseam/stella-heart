@@ -51,12 +51,8 @@ body {
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  /* 背景ガクガク防止 */
-  will-change: transform;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  transform: translate3d(0,0,0);
+  -webkit-transform: translate3d(0,0,0);
 }
 
 .bg-base {
@@ -2224,9 +2220,25 @@ async function initToday(){
   // Energy calculation - 2 groups
   const userAsc = profile ? profile.asc : '';
   const userChiron = profile ? profile.chiron : '';
-  let e = md.e;
-  if(userMoon && userMoon === mI.s) e = Math.min(e + 20, 100);
-  if(userNN && userNN === mI.s) e = Math.min(e + 15, 100);
+
+  // ===== 毎日変わるゆらぎ計算 =====
+  // 月の黄道度数（0〜360）から細かいゆらぎを出す
+  const moonDeg = typeof mE === 'number' ? mE : 0;
+  const moonDegInSign = moonDeg % 30; // 星座内の度数(0〜29)
+  // 月の度数による波（0〜14のゆらぎ）
+  const moonDegWave = Math.round(Math.sin(moonDegInSign / 29 * Math.PI) * 14);
+
+  // 日付リズム（新月〜満月サイクル 29.5日）
+  const JD = (now.getTime() / 86400000) + 2440587.5;
+  const synodicPos = ((JD - 2451549.5) % 29.53058867 + 29.53058867) % 29.53058867;
+  // 満月(14.7日)に近いほど高く、新月付近は低め（0〜12のゆらぎ）
+  const lunarWave = Math.round(Math.sin(synodicPos / 29.53058867 * Math.PI * 2 - Math.PI/2) * 6 + 6);
+
+  // ベースエネルギー（月星座固定値 ＋ 毎日のゆらぎ）
+  let e = md.e + moonDegWave + lunarWave;
+  if(userMoon && userMoon === mI.s) e = e + 20;
+  if(userNN && userNN === mI.s) e = e + 15;
+  e = Math.min(Math.max(e, 30), 100);
 
   // ===== GROUP 1: 魂の資質（北ノード × キロン）=====
   const nnBonus = {'牡羊座':10,'牡牛座':12,'双子座':11,'蟹座':18,'獅子座':14,'乙女座':16,'天秤座':13,'蠍座':19,'射手座':11,'山羊座':9,'水瓶座':12,'魚座':22};
@@ -3846,13 +3858,49 @@ function renderGiftEnergy(){
   const profile = loadProfile();
   const giftEl = document.getElementById('giftEnergyBars');
   if(!giftEl || !profile) return;
-  const moonSign = profile.moonSign || '';
-  const sunSign = profile.sunSign || '';
-  const moonData = MOON_DATA[moonSign] || {e:70};
-  const sunData = MOON_DATA[sunSign] || {e:70};
-  const g1 = Math.min(moonData.e, 100);
-  const g2 = Math.min(sunData.e, 100);
-  const g3 = Math.min(Math.round((g1+g2)/2 + 5), 100);
+
+  const userMoonSign = profile.moon || '';
+  const userSunSign = profile.sun || '';
+
+  // 今日の月星座を取得
+  const todayMoonEcl = moonPos(new Date());
+  const todayMoonSign = getSign(todayMoonEcl).s;
+
+  // 月サイクル位置（新月〜満月）
+  const JD = (new Date().getTime() / 86400000) + 2440587.5;
+  const synodicPos = ((JD - 2451549.5) % 29.53058867 + 29.53058867) % 29.53058867;
+  const lunarPhaseWave = Math.round(Math.sin(synodicPos / 29.53058867 * Math.PI * 2 - Math.PI/2) * 8 + 8); // 0〜16
+
+  // 月の度数ゆらぎ
+  const moonDegInSign = todayMoonEcl % 30;
+  const moonDegWave = Math.round(Math.sin(moonDegInSign / 29 * Math.PI) * 10); // 0〜10
+
+  // 星座の相性スコア（今日の月×出生星座）
+  const compatibility = {
+    '牡羊座':{'牡羊座':20,'獅子座':18,'射手座':18,'双子座':12,'天秤座':8,'水瓶座':12,'蟹座':5,'牡牛座':8,'乙女座':10,'蠍座':5,'山羊座':10,'魚座':8},
+    '牡牛座':{'牡牛座':20,'乙女座':18,'山羊座':18,'蟹座':12,'蠍座':8,'魚座':12,'獅子座':5,'牡羊座':8,'双子座':10,'天秤座':10,'水瓶座':8,'射手座':5},
+    '双子座':{'双子座':20,'天秤座':18,'水瓶座':18,'牡羊座':12,'獅子座':12,'射手座':8,'乙女座':5,'牡牛座':8,'蟹座':8,'蠍座':10,'山羊座':8,'魚座':5},
+    '蟹座':{'蟹座':20,'蠍座':18,'魚座':18,'牡牛座':12,'乙女座':12,'山羊座':8,'天秤座':5,'牡羊座':8,'双子座':8,'獅子座':10,'水瓶座':8,'射手座':5},
+    '獅子座':{'獅子座':20,'牡羊座':18,'射手座':18,'双子座':12,'天秤座':12,'水瓶座':8,'蠍座':5,'牡牛座':8,'蟹座':10,'乙女座':8,'山羊座':8,'魚座':5},
+    '乙女座':{'乙女座':20,'牡牛座':18,'山羊座':18,'蟹座':12,'蠍座':12,'魚座':8,'双子座':5,'牡羊座':8,'獅子座':8,'天秤座':8,'水瓶座':8,'射手座':5},
+    '天秤座':{'天秤座':20,'双子座':18,'水瓶座':18,'獅子座':12,'射手座':12,'牡羊座':8,'山羊座':5,'牡牛座':8,'乙女座':8,'蠍座':8,'蟹座':5,'魚座':8},
+    '蠍座':{'蠍座':20,'蟹座':18,'魚座':18,'乙女座':12,'山羊座':12,'牡牛座':8,'獅子座':5,'牡羊座':5,'双子座':8,'天秤座':8,'水瓶座':8,'射手座':8},
+    '射手座':{'射手座':20,'牡羊座':18,'獅子座':18,'天秤座':12,'水瓶座':12,'双子座':8,'乙女座':5,'牡牛座':5,'蟹座':5,'蠍座':8,'山羊座':8,'魚座':8},
+    '山羊座':{'山羊座':20,'牡牛座':18,'乙女座':18,'蠍座':12,'魚座':12,'蟹座':8,'天秤座':5,'牡羊座':8,'双子座':8,'獅子座':8,'水瓶座':8,'射手座':5},
+    '水瓶座':{'水瓶座':20,'双子座':18,'天秤座':18,'牡羊座':12,'射手座':12,'獅子座':8,'蠍座':5,'牡牛座':8,'蟹座':8,'乙女座':8,'山羊座':8,'魚座':5},
+    '魚座':{'魚座':20,'蟹座':18,'蠍座':18,'牡牛座':12,'山羊座':12,'乙女座':8,'双子座':5,'牡羊座':5,'獅子座':5,'射手座':8,'天秤座':8,'水瓶座':5},
+  };
+
+  const moonCompat = (compatibility[todayMoonSign]||{})[userMoonSign] || 10;
+  const sunCompat  = (compatibility[todayMoonSign]||{})[userSunSign]  || 10;
+
+  // 各バーの計算
+  // ① 愛のエネルギー → 月サイクル × 出生月星座の相性
+  const g1 = Math.min(50 + moonCompat + lunarPhaseWave + moonDegWave, 100);
+  // ② 魂の輝き → 今日の月 × 出生太陽星座の相性
+  const g2 = Math.min(50 + sunCompat + moonDegWave + lunarPhaseWave, 100);
+  // ③ 宇宙との共鳴 → 月の度数の細かいゆらぎ＋両方の平均
+  const g3 = Math.min(Math.round((g1 + g2) / 2) + lunarPhaseWave, 100);
 
   const g1msg = g1>=80
     ? '今日はあなたの愛のエネルギーが最大限に開花しています。周りの人への優しさや思いやりが自然と溢れ出し、あなたの愛が宇宙と共鳴する特別な一日です。'

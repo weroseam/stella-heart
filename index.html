@@ -48,11 +48,16 @@ body {
 /* ===== AURORA BACKGROUND ===== */
 .bg-canvas {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /* 100vhではなくJSで実際の高さを設定（アドレスバー対策）*/
+  height: 100%;
   z-index: 0;
   overflow: hidden;
   transform: translate3d(0,0,0);
   -webkit-transform: translate3d(0,0,0);
+  will-change: auto;
 }
 
 .bg-base {
@@ -3965,6 +3970,18 @@ initSelects();
 initKotodama();
 initTenkeiSelects();
 initSecretMode();
+
+// ===== 背景ガクガク防止：実際の画面高さをCSSカスタムプロパティに設定 =====
+function fixBgHeight(){
+  const h = window.innerHeight;
+  document.documentElement.style.setProperty('--real-vh', h + 'px');
+  const bg = document.querySelector('.bg-canvas');
+  if(bg) bg.style.height = h + 'px';
+}
+fixBgHeight();
+// リサイズ時（アドレスバー出現時）は再計算しない→背景が動かなくなる
+// orientationchangeのみ対応（画面回転時だけ更新）
+window.addEventListener('orientationchange', ()=>{ setTimeout(fixBgHeight, 300); });
 
 // パスワード認証チェック（チラつき防止のためDOMContentLoaded後に実行）
 function initApp(){
